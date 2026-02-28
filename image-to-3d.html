@@ -1,0 +1,395 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to 3D with Gesture Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body { margin: 0; padding: 0; background: #0a0a1a; color: white; font-family: Arial; }
+        #container { display: flex; height: 100vh; }
+        #left-panel { width: 30%; padding: 20px; background: #1a1a2e; }
+        #right-panel { width: 70%; position: relative; }
+        
+        .upload-box { 
+            border: 3px dashed #00ffff; 
+            padding: 40px; 
+            text-align: center; 
+            border-radius: 10px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        
+        .upload-box.dragover { background: rgba(0, 255, 255, 0.1); }
+        
+        #video-container { 
+            position: absolute; 
+            top: 20px; 
+            right: 20px; 
+            width: 240px; 
+            height: 180px;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #video { width: 100%; height: 100%; transform: scaleX(-1); }
+        
+        button { 
+            background: #00ffff; 
+            color: black; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 5px; 
+            font-weight: bold; 
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        button:hover { background: #00cccc; }
+        
+        #status { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 20px; 
+            background: rgba(0,0,0,0.7); 
+            padding: 10px; 
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="left-panel">
+            <h2>🖼️ Image to 3D</h2>
+            <p>Upload image and control with gestures</p>
+            
+            <div class="upload-box" id="dropArea">
+                <div style="font-size: 48px;">📁</div>
+                <h3>Drag & Drop Image Here</h3>
+                <p>or click to select</p>
+                <input type="file" id="fileInput" accept="image/*" style="display:none;">
+            </div>
+            
+            <div id="imageInfo"></div>
+            
+            <button id="convertBtn">🚀 Convert to 3D</button>
+            
+            <div style="margin-top: 30px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px;">
+                <h3>🎮 Gesture Controls:</h3>
+                <p>🤏 <b>Pinch</b> - Zoom In/Out</p>
+                <p>👆 <b>Point</b> - Rotate</p>
+                <p>✊ <b>Fist</b> - Reset</p>
+            </div>
+        </div>
+        
+        <div id="right-panel">
+            <div id="canvas-container"></div>
+            
+            <div id="video-container">
+                <video id="video" autoplay playsinline muted></video>
+            </div>
+            
+            <div id="status">Status: Ready</div>
+        </div>
+    </div>
+
+    <script>
+        // ========== BASIC SETUP ==========
+        let scene, camera, renderer, imageMesh;
+        let currentImage = null;
+        let hands = null;
+        let videoStream = null;
+        
+        // Initialize 3D scene
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth * 0.7 / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth * 0.7, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            // Add lights
+            scene.add(new THREE.AmbientLight(0x404040));
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 5, 5);
+            scene.add(light);
+            
+            // Start animation
+            animate();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        
+        // ========== DRAG & DROP ==========
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        // Click to select file
+        dropArea.addEventListener('click', () => fileInput.click());
+        
+        // File selected
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag over
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        
+        // Drag leave
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+        
+        // Drop file
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        function handleFileSelect(e) {
+            if (e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        }
+        
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                updateStatus('Please select an image file');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImage = e.target.result;
+                
+                // Show file info
+                document.getElementById('imageInfo').innerHTML = `
+                    <div style="background: rgba(0,255,255,0.1); padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <b>Selected:</b> ${file.name}<br>
+                        <b>Size:</b> ${(file.size/1024).toFixed(1)} KB<br>
+                        <b>Type:</b> ${file.type}
+                    </div>
+                `;
+                
+                updateStatus('Image ready to convert');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // ========== 3D CONVERSION ==========
+        document.getElementById('convertBtn').addEventListener('click', () => {
+            if (!currentImage) {
+                updateStatus('Please upload an image first');
+                return;
+            }
+            
+            // Remove old mesh
+            if (imageMesh) {
+                scene.remove(imageMesh);
+            }
+            
+            // Create texture
+            const texture = new THREE.TextureLoader().load(currentImage);
+            
+            // Create 3D box with image on front
+            const geometry = new THREE.BoxGeometry(4, 3, 0.2);
+            const materials = [
+                new THREE.MeshBasicMaterial({ color: 0x333333 }),
+                new THREE.MeshBasicMaterial({ color: 0x333333 }),
+                new THREE.MeshBasicMaterial({ color: 0x333333 }),
+                new THREE.MeshBasicMaterial({ color: 0x333333 }),
+                new THREE.MeshBasicMaterial({ map: texture }),
+                new THREE.MeshBasicMaterial({ color: 0x333333 })
+            ];
+            
+            imageMesh = new THREE.Mesh(geometry, materials);
+            scene.add(imageMesh);
+            
+            updateStatus('3D Model Created! Use gestures to control');
+        });
+        
+        // ========== CAMERA & GESTURES ==========
+        async function startCamera() {
+            try {
+                const video = document.getElementById('video');
+                
+                // Get video stream
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                });
+                
+                video.srcObject = videoStream;
+                
+                // Setup MediaPipe Hands
+                hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+                
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                
+                hands.onResults(onHandResults);
+                
+                // Process video frames
+                async function processVideoFrame() {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        await hands.send({ image: video });
+                    }
+                    requestAnimationFrame(processVideoFrame);
+                }
+                
+                video.onloadeddata = () => {
+                    updateStatus('Camera active - Show your hand');
+                    processVideoFrame();
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                updateStatus('Camera error: ' + error.message);
+                
+                // Fallback: Use sample hand data for testing
+                simulateHandTracking();
+            }
+        }
+        
+        function onHandResults(results) {
+            if (!imageMesh || !results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                return;
+            }
+            
+            const landmarks = results.multiHandLandmarks[0];
+            
+            // Get thumb and index finger
+            const thumbTip = landmarks[4];
+            const indexTip = landmarks[8];
+            
+            // Calculate pinch distance
+            const pinchDist = Math.sqrt(
+                Math.pow(thumbTip.x - indexTip.x, 2) +
+                Math.pow(thumbTip.y - indexTip.y, 2)
+            );
+            
+            // ZOOM with pinch
+            if (pinchDist < 0.05) {
+                const zoom = 2.0 - pinchDist * 20;
+                camera.position.z = Math.max(2, Math.min(10, 5 / zoom));
+                updateStatus('Pinching - Zooming');
+            }
+            
+            // ROTATE with index finger position
+            if (landmarks.length > 8) {
+                const rotationY = (indexTip.x - 0.5) * 4;
+                const rotationX = (indexTip.y - 0.5) * 2;
+                imageMesh.rotation.x = rotationX;
+                imageMesh.rotation.y = rotationY;
+            }
+            
+            // Check for fist (all fingers closed)
+            const isFist = checkFist(landmarks);
+            if (isFist) {
+                // Reset position
+                camera.position.z = 5;
+                if (imageMesh) {
+                    imageMesh.rotation.set(0, 0, 0);
+                }
+                updateStatus('Fist detected - Reset view');
+            }
+        }
+        
+        function checkFist(landmarks) {
+            // Simple fist detection: check if fingertips are close to palm
+            const wrist = landmarks[0];
+            const thumbTip = landmarks[4];
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            const ringTip = landmarks[16];
+            const pinkyTip = landmarks[20];
+            
+            const tips = [thumbTip, indexTip, middleTip, ringTip, pinkyTip];
+            let closeCount = 0;
+            
+            for (let tip of tips) {
+                const dist = Math.sqrt(
+                    Math.pow(tip.x - wrist.x, 2) +
+                    Math.pow(tip.y - wrist.y, 2)
+                );
+                if (dist < 0.2) {
+                    closeCount++;
+                }
+            }
+            
+            return closeCount >= 4; // Most fingers are close to wrist
+        }
+        
+        // Fallback hand simulation for testing
+        function simulateHandTracking() {
+            let simulatedRotation = 0;
+            
+            setInterval(() => {
+                if (imageMesh) {
+                    // Simulate rotation
+                    simulatedRotation += 0.02;
+                    imageMesh.rotation.y = Math.sin(simulatedRotation) * 2;
+                    imageMesh.rotation.x = Math.cos(simulatedRotation) * 0.5;
+                }
+            }, 100);
+            
+            updateStatus('Camera not available - Using simulated gestures');
+        }
+        
+        // ========== HELPER FUNCTIONS ==========
+        function updateStatus(message) {
+            document.getElementById('status').textContent = 'Status: ' + message;
+        }
+        
+        // Window resize
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = (window.innerWidth * 0.7) / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth * 0.7, window.innerHeight);
+            }
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+        });
+        
+        // ========== START EVERYTHING ==========
+        window.onload = function() {
+            initThreeJS();
+            startCamera();
+            updateStatus('Ready - Upload an image');
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,741 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Image Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            z-index: 10;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .dashboard-link {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 30px;
+            text-decoration: none;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .dashboard-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .controls {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 15px;
+            margin: 15px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+        
+        .controls h2 {
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+        
+        .controls ul {
+            list-style-type: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .controls li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .icon {
+            font-size: 1.2rem;
+        }
+        
+        .upload-section {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+        
+        .upload-section h2 {
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            margin-right: 10px;
+        }
+        
+        .upload-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .clear-btn {
+            background: rgba(255, 100, 100, 0.3);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .clear-btn:hover {
+            background: rgba(255, 100, 100, 0.5);
+        }
+        
+        .gallery-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            margin-top: 10px;
+            min-height: 500px;
+        }
+        
+        #gallery3d {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.1s;
+        }
+        
+        .image-plane {
+            position: absolute;
+            width: 250px;
+            height: 180px;
+            transform-style: preserve-3d;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+        
+        .image-plane:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+        }
+        
+        .image-plane img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .image-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+        
+        .image-plane:hover .image-info {
+            transform: translateY(0);
+        }
+        
+        .image-title {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .image-desc {
+            font-size: 0.7rem;
+            opacity: 0.8;
+        }
+        
+        .empty-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0.7;
+        }
+        
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+        
+        .uploaded-files {
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .uploaded-file {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .file-icon {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .file-name {
+            flex: 1;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-size {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 15px 0;
+            margin-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 10;
+        }
+        
+        .dashboard-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .dashboard-content {
+            background: linear-gradient(135deg, #2a3a8c, #c22f2f, #fdcb3d);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .dashboard-content h2 {
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+        
+        .dashboard-content p {
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .dashboard-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .dashboard-option {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-option:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-5px);
+        }
+        
+        .close-dashboard {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .close-dashboard:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .controls ul {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .image-plane {
+                width: 200px;
+                height: 150px;
+            }
+            
+            .dashboard-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>3D Image Explorer</h1>
+            <p class="subtitle">Upload and view your images in 3D</p>
+            <a href="#" class="dashboard-link" id="dashboardLink">Back to Dashboard</a>
+        </header>
+        
+        <section class="controls">
+            <h2>Controls:</h2>
+            <ul>
+                <li><span class="icon">↔️</span> Click and drag to rotate</li>
+                <li><span class="icon">🔍</span> Scroll to zoom</li>
+                <li><span class="icon">🖱️</span> Right-click and drag to pan</li>
+            </ul>
+        </section>
+        
+        <section class="upload-section">
+            <h2>Upload Your Images:</h2>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p>Drag & drop images here or click to browse</p>
+                <p style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">Supports JPG, PNG, GIF (Max 5MB)</p>
+            </div>
+            <input type="file" id="fileInput" class="file-input" multiple accept="image/*">
+            <button class="upload-btn" id="uploadBtn">Select Images</button>
+            <button class="clear-btn" id="clearBtn">Clear All</button>
+            
+            <div class="uploaded-files" id="uploadedFiles">
+                <!-- Uploaded files will appear here -->
+            </div>
+        </section>
+        
+        <div class="gallery-container">
+            <div id="gallery3d">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">🖼️</div>
+                    <p>No images uploaded yet</p>
+                    <p style="font-size: 0.9rem; margin-top: 5px;">Upload some images to see them in 3D!</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>3D Image Explorer &copy; 2023</p>
+        </footer>
+    </div>
+
+    <!-- Dashboard Modal -->
+    <div class="dashboard-modal" id="dashboardModal">
+        <div class="dashboard-content">
+            <h2>Dashboard</h2>
+            <p>Welcome to your 3D Image Explorer Dashboard</p>
+            
+            <div class="dashboard-options">
+                <div class="dashboard-option">
+                    <h3>My Gallery</h3>
+                    <p>View your uploaded images</p>
+                </div>
+                <div class="dashboard-option">
+                    <h3>Settings</h3>
+                    <p>Customize your experience</p>
+                </div>
+                <div class="dashboard-option">
+                    <h3>Help</h3>
+                    <p>Get assistance with the app</p>
+                </div>
+                <div class="dashboard-option">
+                    <h3>Export</h3>
+                    <p>Save your 3D scenes</p>
+                </div>
+            </div>
+            
+            <button class="close-dashboard" id="closeDashboard">Return to 3D Explorer</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize 3D gallery
+        document.addEventListener('DOMContentLoaded', function() {
+            const gallery = document.getElementById('gallery3d');
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const emptyState = document.getElementById('emptyState');
+            const uploadedFiles = document.getElementById('uploadedFiles');
+            const dashboardLink = document.getElementById('dashboardLink');
+            const dashboardModal = document.getElementById('dashboardModal');
+            const closeDashboard = document.getElementById('closeDashboard');
+            
+            const radius = 500; // Radius of the sphere where images are placed
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let rotation = { x: 0, y: 0 };
+            let scale = 1;
+            let pan = { x: 0, y: 0 };
+            let isRightClick = false;
+            let uploadedImages = [];
+            
+            // Dashboard link functionality
+            dashboardLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                dashboardModal.style.display = 'flex';
+            });
+            
+            // Close dashboard functionality
+            closeDashboard.addEventListener('click', function() {
+                dashboardModal.style.display = 'none';
+            });
+            
+            // Close dashboard when clicking outside the content
+            dashboardModal.addEventListener('click', function(e) {
+                if (e.target === dashboardModal) {
+                    dashboardModal.style.display = 'none';
+                }
+            });
+            
+            // Upload button click event
+            uploadBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // Clear button click event
+            clearBtn.addEventListener('click', function() {
+                uploadedImages = [];
+                updateGallery();
+                updateUploadedFilesList();
+            });
+            
+            // Upload area click event
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // Drag and drop events
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.7)';
+                uploadArea.style.background = 'rgba(255, 255, 255, 0.1)';
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                uploadArea.style.background = 'transparent';
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                uploadArea.style.background = 'transparent';
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+            
+            // File input change event
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    handleFiles(fileInput.files);
+                }
+            });
+            
+            // Handle uploaded files
+            function handleFiles(files) {
+                let validFiles = [];
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    
+                    // Check if file is an image
+                    if (!file.type.match('image.*')) {
+                        alert(`"${file.name}" is not an image file. Please upload only image files.`);
+                        continue;
+                    }
+                    
+                    // Check file size (max 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert(`"${file.name}" is too large. File size must be less than 5MB.`);
+                        continue;
+                    }
+                    
+                    validFiles.push(file);
+                }
+                
+                if (validFiles.length === 0) return;
+                
+                // Process valid files
+                validFiles.forEach(file => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        // Add image to uploaded images array
+                        uploadedImages.push({
+                            url: e.target.result,
+                            name: file.name,
+                            size: file.size
+                        });
+                        
+                        // Update gallery and file list
+                        updateGallery();
+                        updateUploadedFilesList();
+                    };
+                    
+                    reader.readAsDataURL(file);
+                });
+            }
+            
+            // Update the uploaded files list
+            function updateUploadedFilesList() {
+                uploadedFiles.innerHTML = '';
+                
+                if (uploadedImages.length === 0) {
+                    uploadedFiles.innerHTML = '<p style="text-align: center; opacity: 0.7; padding: 10px;">No files uploaded</p>';
+                    return;
+                }
+                
+                uploadedImages.forEach((image, index) => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'uploaded-file';
+                    fileElement.innerHTML = `
+                        <div class="file-icon">🖼️</div>
+                        <div class="file-name">${image.name}</div>
+                        <div class="file-size">${formatFileSize(image.size)}</div>
+                    `;
+                    uploadedFiles.appendChild(fileElement);
+                });
+            }
+            
+            // Update the 3D gallery with uploaded images
+            function updateGallery() {
+                // Clear existing gallery
+                gallery.innerHTML = '';
+                
+                // Hide empty state if we have images
+                if (uploadedImages.length > 0) {
+                    emptyState.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                
+                // Create image planes in 3D space
+                uploadedImages.forEach((image, index) => {
+                    const plane = document.createElement('div');
+                    plane.className = 'image-plane';
+                    
+                    // Calculate position on a sphere
+                    const phi = Math.acos(-1 + (2 * index) / uploadedImages.length);
+                    const theta = Math.sqrt(uploadedImages.length * Math.PI) * phi;
+                    
+                    const x = radius * Math.cos(theta) * Math.sin(phi);
+                    const y = radius * Math.sin(theta) * Math.sin(phi);
+                    const z = radius * Math.cos(phi);
+                    
+                    plane.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+                    
+                    // Add image
+                    const img = document.createElement('img');
+                    img.src = image.url;
+                    img.alt = image.name;
+                    plane.appendChild(img);
+                    
+                    // Add info overlay
+                    const info = document.createElement('div');
+                    info.className = 'image-info';
+                    info.innerHTML = `
+                        <div class="image-title">${image.name}</div>
+                        <div class="image-desc">${formatFileSize(image.size)}</div>
+                    `;
+                    plane.appendChild(info);
+                    
+                    gallery.appendChild(plane);
+                });
+                
+                // Reset view
+                rotation = { x: 0, y: 0 };
+                scale = 1;
+                pan = { x: 0, y: 0 };
+                updateGalleryTransform();
+            }
+            
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Mouse events for rotation
+            gallery.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+                isRightClick = e.button === 2; // Right click
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+                
+                if (isRightClick) {
+                    // Panning
+                    pan.x += deltaX;
+                    pan.y += deltaY;
+                } else {
+                    // Rotation
+                    rotation.y += deltaX * 0.5;
+                    rotation.x += deltaY * 0.5;
+                }
+                
+                updateGalleryTransform();
+                
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+            
+            // Wheel event for zooming
+            gallery.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                
+                if (e.deltaY < 0) {
+                    // Zoom in
+                    scale = Math.min(2, scale + 0.1);
+                } else {
+                    // Zoom out
+                    scale = Math.max(0.5, scale - 0.1);
+                }
+                
+                updateGalleryTransform();
+            });
+            
+            // Prevent context menu on right-click
+            gallery.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+            });
+            
+            // Update gallery transform based on current rotation, scale and pan
+            function updateGalleryTransform() {
+                gallery.style.transform = `
+                    translate3d(${pan.x}px, ${pan.y}px, 0)
+                    scale(${scale})
+                    rotateX(${rotation.x}deg)
+                    rotateY(${rotation.y}deg)
+                `;
+            }
+            
+            // Initial empty state
+            updateGallery();
+            updateUploadedFilesList();
+        });
+    </script>
+</body>
+</html>

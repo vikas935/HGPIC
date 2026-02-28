@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture-Controlled 3D DNA Model Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0d1421 0%, #1a2332 50%, #2c3e50 100%);
+            overflow: hidden;
+            color: white;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #video-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            height: 240px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 255, 255, 0.3);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        #video-container:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(0, 255, 255, 0.5);
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            max-width: 350px;
+        }
+
+        .ui-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #00ffff, #0080ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .gesture-info {
+            margin-bottom: 20px;
+        }
+
+        .gesture-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .gesture-item:hover {
+            background: rgba(0, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .gesture-name {
+            font-weight: 600;
+            color: #00ffff;
+        }
+
+        .gesture-action {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .control-item {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .control-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .control-value {
+            font-weight: 700;
+            color: #00ffff;
+            font-size: 1.1rem;
+        }
+
+        #status-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 20, 40, 0.95);
+            padding: 15px 25px;
+            border-radius: 50px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0d1421;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(0, 255, 255, 0.3);
+            border-top: 3px solid #00ffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .feature-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .toggle-switch {
+            width: 40px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: #00ffff;
+        }
+
+        .toggle-switch::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch.active::before {
+            transform: translateX(20px);
+        }
+
+        /* Base Info Popup Styles */
+        #base-info-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            background: rgba(0, 20, 40, 0.98);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            display: none;
+            color: white;
+        }
+
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .popup-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .base-color-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .close-popup {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .close-popup:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .popup-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .base-image {
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .base-image img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .base-details {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .detail-value {
+            font-weight: 600;
+        }
+
+        .base-description {
+            grid-column: 1 / -1;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        #popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 99;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            #ui-panel {
+                max-width: 280px;
+                padding: 20px;
+            }
+            
+            #video-container {
+                width: 240px;
+                height: 180px;
+            }
+
+            #base-info-popup {
+                width: 90%;
+                max-width: 350px;
+            }
+
+            .popup-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <h2>Loading DNA Explorer...</h2>
+        <p>Initializing hand tracking and 3D visualization</p>
+    </div>
+
+    <div id="container">
+        <div id="canvas-container"></div>
+        
+        <div id="video-container">
+            <video id="video" autoplay muted playsinline></video>
+        </div>
+
+        <div id="ui-panel">
+            <h1 class="ui-title">DNA Explorer</h1>
+            
+            <div class="gesture-info">
+                <div class="gesture-item">
+                    <span class="gesture-name">👆 Point</span>
+                    <span class="gesture-action">Rotate</span>
+                </div>
+                <div class="gesture-item">
+                    <span class="gesture-name">🤏 Pinch</span>
+                    <span class="gesture-action">Zoom</span>
+                </div>
+                <div class="gesture-item">
+                    <span class="gesture-name">✋ Open Hand</span>
+                    <span class="gesture-action">Move</span>
+                </div>
+                <div class="gesture-item">
+                    <span class="gesture-name">✊ Fist</span>
+                    <span class="gesture-action">Reset</span>
+                </div>
+            </div>
+
+            <div class="feature-toggle">
+                <span>Hydrogen Bonds</span>
+                <div class="toggle-switch" id="bonds-toggle"></div>
+            </div>
+            <div class="feature-toggle">
+                <span>Base Labels</span>
+                <div class="toggle-switch" id="labels-toggle"></div>
+            </div>
+            <div class="feature-toggle">
+                <span>Backbone</span>
+                <div class="toggle-switch active" id="backbone-toggle"></div>
+            </div>
+            <div class="feature-toggle">
+                <span>Animation</span>
+                <div class="toggle-switch active" id="animation-toggle"></div>
+            </div>
+
+            <div class="controls">
+                <div class="control-item">
+                    <div class="control-label">Rotation</div>
+                    <div class="control-value" id="rotation-display">0°, 0°</div>
+                </div>
+                <div class="control-item">
+                    <div class="control-label">Zoom</div>
+                    <div class="control-value" id="zoom-display">1.0x</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status-indicator">
+            <div class="status-dot"></div>
+            <span>Hand Tracking Active</span>
+        </div>
+
+        <!-- Base Info Popup -->
+        <div id="popup-overlay"></div>
+        <div id="base-info-popup">
+            <div class="popup-header">
+                <h2 class="popup-title">
+                    <span class="base-color-indicator" id="base-color-indicator"></span>
+                    <span id="base-name">Adenine</span>
+                </h2>
+                <button class="close-popup" id="close-popup">×</button>
+            </div>
+            <div class="popup-content">
+                <div class="base-image">
+                    <img id="base-structure-img" src="" alt="Base structure">
+                </div>
+                <div class="base-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Type</span>
+                        <span class="detail-value" id="base-type">Purine</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Formula</span>
+                        <span class="detail-value" id="base-formula">C₅H₅N₅</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Pairs With</span>
+                        <span class="detail-value" id="base-pairs-with">Thymine</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Hydrogen Bonds</span>
+                        <span class="detail-value" id="base-bonds">2</span>
+                    </div>
+                </div>
+                <div class="base-description" id="base-description">
+                    A purine base that pairs with thymine through two hydrogen bonds.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <script>
+        // Global variables
+        let scene, camera, renderer, dnaModel;
+        let handDetection = null;
+        let currentGesture = null;
+        let rotationX = 0, rotationY = 0;
+        let zoom = 1.0;
+        let animationSpeed = 1.0;
+        let showBonds = false;
+        let showLabels = false;
+        let showBackbone = true;
+        let isAnimating = true;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let baseMeshes = [];
+
+        // DNA data structure
+        const dnaSequence = [
+            'AT', 'GC', 'CG', 'TA', 'GC', 'AT', 'CG', 'TA',
+            'GC', 'AT', 'TA', 'CG', 'AT', 'GC', 'TA', 'CG'
+        ];
+
+        // Colors for DNA components
+        const colors = {
+            A: 0xff6b6b, // Red (Adenine)
+            T: 0xffd93d, // Yellow (Thymine)
+            G: 0x6bcf7f, // Green (Guanine)
+            C: 0x4dabf7, // Blue (Cytosine)
+            hydrogen: 0xffffff, // White (Hydrogen bonds)
+            sugar: 0xd69e2e, // Orange (Sugar)
+            phosphate: 0xe53e3e, // Red (Phosphate)
+            backbone: 0x718096 // Gray (Backbone)
+        };
+
+        // Base information
+        const baseInfo = {
+            'A': {
+                name: "Adenine",
+                type: "Purine",
+                formula: "C₅H₅N₅",
+                pairsWith: "Thymine",
+                bonds: 2,
+                color: "#ff6b6b",
+                description: "A purine base that pairs with thymine through two hydrogen bonds.",
+                image: "images/adenosine.png"
+            },
+            'T': {
+                name: "Thymine",
+                type: "Pyrimidine", 
+                formula: "C₅H₆N₂O₂",
+                pairsWith: "Adenine",
+                bonds: 2,
+                color: "#ffd93d",
+                description: "A pyrimidine base that pairs with adenine through two hydrogen bonds.",
+                image: "images/thymine.png"
+            },
+            'G': {
+                name: "Guanine",
+                type: "Purine",
+                formula: "C₅H₅N₅O", 
+                pairsWith: "Cytosine",
+                bonds: 3,
+                color: "#6bcf7f",
+                description: "A purine base that pairs with cytosine through three hydrogen bonds.",
+                image: "images/Guanine.png"
+            },
+            'C': {
+                name: "Cytosine",
+                type: "Pyrimidine",
+                formula: "C₄H₅N₃O",
+                pairsWith: "Guanine", 
+                bonds: 3,
+                color: "#4dabf7",
+                description: "A pyrimidine base that pairs with guanine through three hydrogen bonds.",
+                image: "images/cytosine.jpg"
+            }
+        };
+
+        class DNARenderer {
+            constructor() {
+                this.helixRadius = 2.5;
+                this.helixPitch = 3.4;
+                this.basePairDistance = 0.34;
+                this.dnaGroup = new THREE.Group();
+                this.labels = [];
+                this.bonds = [];
+                this.backboneElements = [];
+            }
+
+            createDNA() {
+                this.dnaGroup.clear();
+                this.labels = [];
+                this.bonds = [];
+                this.backboneElements = [];
+                baseMeshes = [];
+
+                const totalPairs = dnaSequence.length;
+                
+                for (let i = 0; i < totalPairs; i++) {
+                    const pair = dnaSequence[i];
+                    const base1 = pair[0];
+                    const base2 = pair[1];
+                    
+                    const angle = (i / totalPairs) * Math.PI * 4;
+                    const y = (i - totalPairs / 2) * this.basePairDistance;
+                    
+                    // Strand 1 position
+                    const x1 = this.helixRadius * Math.cos(angle);
+                    const z1 = this.helixRadius * Math.sin(angle);
+                    
+                    // Strand 2 position (opposite)
+                    const x2 = this.helixRadius * Math.cos(angle + Math.PI);
+                    const z2 = this.helixRadius * Math.sin(angle + Math.PI);
+                    
+                    // Create bases
+                    const base1Mesh = this.createBase(base1, x1, y, z1);
+                    const base2Mesh = this.createBase(base2, x2, y, z2);
+                    
+                    this.dnaGroup.add(base1Mesh);
+                    this.dnaGroup.add(base2Mesh);
+                    
+                    // Store base meshes for click detection
+                    baseMeshes.push({mesh: base1Mesh, baseType: base1});
+                    baseMeshes.push({mesh: base2Mesh, baseType: base2});
+                    
+                    // Create hydrogen bonds
+                    if (showBonds) {
+                        const bondMesh = this.createHydrogenBond(
+                            new THREE.Vector3(x1, y, z1),
+                            new THREE.Vector3(x2, y, z2),
+                            pair
+                        );
+                        this.bonds.push(bondMesh);
+                        this.dnaGroup.add(bondMesh);
+                    }
+                    
+                    // Create backbone
+                    if (showBackbone && i > 0) {
+                        const prevAngle = ((i - 1) / totalPairs) * Math.PI * 4;
+                        const prevY = ((i - 1) - totalPairs / 2) * this.basePairDistance;
+                        
+                        // Strand 1 backbone
+                        const backbone1 = this.createBackboneSegment(
+                            new THREE.Vector3(
+                                this.helixRadius * Math.cos(prevAngle),
+                                prevY,
+                                this.helixRadius * Math.sin(prevAngle)
+                            ),
+                            new THREE.Vector3(x1, y, z1)
+                        );
+                        this.backboneElements.push(backbone1);
+                        this.dnaGroup.add(backbone1);
+                        
+                        // Strand 2 backbone
+                        const backbone2 = this.createBackboneSegment(
+                            new THREE.Vector3(
+                                this.helixRadius * Math.cos(prevAngle + Math.PI),
+                                prevY,
+                                this.helixRadius * Math.sin(prevAngle + Math.PI)
+                            ),
+                            new THREE.Vector3(x2, y, z2)
+                        );
+                        this.backboneElements.push(backbone2);
+                        this.dnaGroup.add(backbone2);
+                    }
+                    
+                    // Create labels
+                    if (showLabels) {
+                        const label1 = this.createLabel(base1, x1, y + 0.5, z1);
+                        const label2 = this.createLabel(base2, x2, y + 0.5, z2);
+                        this.labels.push(label1, label2);
+                        this.dnaGroup.add(label1, label2);
+                    }
+                }
+                
+                return this.dnaGroup;
+            }
+
+            createBase(baseType, x, y, z) {
+                const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+                const material = new THREE.MeshPhongMaterial({
+                    color: colors[baseType],
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(x, y, z);
+                mesh.userData = { type: 'base', baseType };
+                
+                return mesh;
+            }
+
+            createHydrogenBond(pos1, pos2, basePair) {
+                const direction = new THREE.Vector3().subVectors(pos2, pos1);
+                const length = direction.length();
+                direction.normalize();
+                
+                // Number of bonds: A-T has 2, G-C has 3
+                const numBonds = (basePair === 'AT' || basePair === 'TA') ? 2 : 3;
+                const bondGroup = new THREE.Group();
+                
+                for (let i = 0; i < numBonds; i++) {
+                    const offset = (i - (numBonds - 1) / 2) * 0.1;
+                    const perpendicular = new THREE.Vector3(0, 1, 0);
+                    if (Math.abs(direction.y) > 0.99) {
+                        perpendicular.set(1, 0, 0);
+                    }
+                    perpendicular.cross(direction).normalize().multiplyScalar(offset);
+                    
+                    const startPos = pos1.clone().add(perpendicular);
+                    const endPos = pos2.clone().add(perpendicular);
+                    
+                    const bondGeometry = new THREE.CylinderGeometry(0.02, 0.02, length, 8);
+                    const bondMaterial = new THREE.MeshPhongMaterial({
+                        color: colors.hydrogen,
+                        transparent: true,
+                        opacity: 0.6
+                    });
+                    
+                    const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+                    const midPoint = new THREE.Vector3().addVectors(startPos, endPos).multiplyScalar(0.5);
+                    bond.position.copy(midPoint);
+                    bond.lookAt(endPos);
+                    bond.rotateX(Math.PI / 2);
+                    
+                    bondGroup.add(bond);
+                }
+                
+                return bondGroup;
+            }
+
+            createBackboneSegment(pos1, pos2) {
+                const direction = new THREE.Vector3().subVectors(pos2, pos1);
+                const length = direction.length();
+                
+                const geometry = new THREE.CylinderGeometry(0.05, 0.05, length, 8);
+                const material = new THREE.MeshPhongMaterial({
+                    color: colors.backbone,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                const midPoint = new THREE.Vector3().addVectors(pos1, pos2).multiplyScalar(0.5);
+                mesh.position.copy(midPoint);
+                mesh.lookAt(pos2);
+                mesh.rotateX(Math.PI / 2);
+                
+                return mesh;
+            }
+
+            createLabel(baseType, x, y, z) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 64;
+                canvas.height = 64;
+                
+                context.fillStyle = '#ffffff';
+                context.font = '48px Arial';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(baseType, 32, 32);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true
+                });
+                
+                const sprite = new THREE.Sprite(material);
+                sprite.position.set(x, y, z);
+                sprite.scale.set(0.5, 0.5, 0.5);
+                
+                return sprite;
+            }
+        }
+
+        class HandGestureController {
+            constructor() {
+                this.hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+
+                this.hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.8,
+                    minTrackingConfidence: 0.7
+                });
+
+                this.hands.onResults(this.onResults.bind(this));
+            }
+
+            onResults(results) {
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const landmarks = results.multiHandLandmarks[0];
+                    this.processGesture(landmarks);
+                }
+            }
+
+            processGesture(landmarks) {
+                const gesture = this.detectGesture(landmarks);
+                
+                switch (gesture.type) {
+                    case 'point':
+                        // Rotation control using index finger position
+                        const indexTip = landmarks[8];
+                        rotationY = (indexTip.x - 0.5) * 360;
+                        rotationX = (indexTip.y - 0.5) * 180;
+                        break;
+                        
+                    case 'pinch':
+                        // Zoom control using pinch distance
+                        const thumbTip = landmarks[4];
+                        const indexTipPinch = landmarks[8];
+                        const distance = Math.sqrt(
+                            Math.pow(thumbTip.x - indexTipPinch.x, 2) +
+                            Math.pow(thumbTip.y - indexTipPinch.y, 2)
+                        );
+                        zoom = Math.max(0.5, Math.min(3.0, 2.0 - distance * 5));
+                        break;
+                        
+                    case 'fist':
+                        // Reset position
+                        rotationX = 0;
+                        rotationY = 0;
+                        zoom = 1.0;
+                        break;
+                        
+                    case 'open_hand':
+                        // Move/pan control
+                        const palmCenter = landmarks[9]; // Middle of palm
+                        // You can implement panning here if needed
+                        break;
+                }
+                
+                currentGesture = gesture.type;
+                updateUI();
+            }
+
+            detectGesture(landmarks) {
+                // Get finger tip and pip positions
+                const thumbTip = landmarks[4];
+                const thumbPip = landmarks[3];
+                const indexTip = landmarks[8];
+                const indexPip = landmarks[6];
+                const middleTip = landmarks[12];
+                const middlePip = landmarks[10];
+                const ringTip = landmarks[16];
+                const ringPip = landmarks[14];
+                const pinkyTip = landmarks[20];
+                const pinkyPip = landmarks[18];
+
+                // Check which fingers are extended
+                const isThumbUp = thumbTip.x > thumbPip.x; // Simplified thumb check
+                const isIndexUp = indexTip.y < indexPip.y;
+                const isMiddleUp = middleTip.y < middlePip.y;
+                const isRingUp = ringTip.y < ringPip.y;
+                const isPinkyUp = pinkyTip.y < pinkyPip.y;
+
+                const extendedFingers = [isThumbUp, isIndexUp, isMiddleUp, isRingUp, isPinkyUp];
+                const numExtended = extendedFingers.filter(Boolean).length;
+
+                // Detect pinch gesture
+                const pinchDistance = Math.sqrt(
+                    Math.pow(thumbTip.x - indexTip.x, 2) +
+                    Math.pow(thumbTip.y - indexTip.y, 2)
+                );
+
+                if (pinchDistance < 0.05) {
+                    return { type: 'pinch', confidence: 0.9 };
+                }
+
+                // Detect gestures based on extended fingers
+                if (numExtended === 1 && isIndexUp) {
+                    return { type: 'point', confidence: 0.8 };
+                } else if (numExtended === 5) {
+                    return { type: 'open_hand', confidence: 0.8 };
+                } else if (numExtended === 0) {
+                    return { type: 'fist', confidence: 0.8 };
+                }
+
+                return { type: 'unknown', confidence: 0.0 };
+            }
+        }
+
+        // Initialize Three.js scene
+        function initThreeJS() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d1421);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 8);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 5, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            const pointLight1 = new THREE.PointLight(0x00ffff, 0.5, 100);
+            pointLight1.position.set(-5, 0, 5);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0xff00ff, 0.3, 100);
+            pointLight2.position.set(5, 0, -5);
+            scene.add(pointLight2);
+
+            // Create DNA model
+            const dnaRenderer = new DNARenderer();
+            dnaModel = dnaRenderer.createDNA();
+            scene.add(dnaModel);
+        }
+
+        // Add back to home button
+        const backButton = document.createElement('button');
+        backButton.innerText = 'Back to Home';
+        backButton.style.position = 'absolute';
+        backButton.style.bottom = '20px';
+        backButton.style.right = '20px';
+        backButton.style.padding = '10px 20px';
+        backButton.style.backgroundColor = '#667eea';
+        backButton.style.color = 'white';
+        backButton.style.border = 'none';
+        backButton.style.borderRadius = '5px';
+        backButton.style.cursor = 'pointer';
+        backButton.style.zIndex = '1000';
+        backButton.onclick = () => {
+            window.location.href = '/'; // Navigate to the root (index.html)
+        };
+        document.body.appendChild(backButton);
+
+        // Initialize MediaPipe
+        async function initMediaPipe() {
+            const videoElement = document.getElementById('video');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                videoElement.srcObject = stream;
+                
+                const gestureController = new HandGestureController();
+                
+                const camera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await gestureController.hands.send({ image: videoElement });
+                    },
+                    width: 640,
+                    height: 480
+                });
+                
+                await camera.start();
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                document.getElementById('status-indicator').innerHTML = 
+                    '<div style="background: #ff0000; width: 12px; height: 12px; border-radius: 50%;"></div>' +
+                    '<span>Camera Access Failed</span>';
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (dnaModel && isAnimating) {
+                // Apply gesture-based transformations
+                dnaModel.rotation.x = THREE.MathUtils.lerp(dnaModel.rotation.x, rotationX * Math.PI / 180, 0.1);
+                dnaModel.rotation.y = THREE.MathUtils.lerp(dnaModel.rotation.y, rotationY * Math.PI / 180, 0.1);
+                
+                // Apply zoom
+                camera.position.z = THREE.MathUtils.lerp(camera.position.z, 8 / zoom, 0.1);
+                
+                // Continuous rotation animation
+                if (currentGesture !== 'point') {
+                    dnaModel.rotation.y += 0.005 * animationSpeed;
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // UI Update functions
+        function updateUI() {
+            document.getElementById('rotation-display').textContent = 
+                `${rotationX.toFixed(0)}°, ${rotationY.toFixed(0)}°`;
+            document.getElementById('zoom-display').textContent = `${zoom.toFixed(1)}x`;
+        }
+
+        // Toggle functions
+        function setupToggles() {
+            document.getElementById('bonds-toggle').addEventListener('click', function() {
+                showBonds = !showBonds;
+                this.classList.toggle('active');
+                updateDNAModel();
+            });
+
+            document.getElementById('labels-toggle').addEventListener('click', function() {
+                showLabels = !showLabels;
+                this.classList.toggle('active');
+                updateDNAModel();
+            });
+
+            document.getElementById('backbone-toggle').addEventListener('click', function() {
+                showBackbone = !showBackbone;
+                this.classList.toggle('active');
+                updateDNAModel();
+            });
+
+            document.getElementById('animation-toggle').addEventListener('click', function() {
+                isAnimating = !isAnimating;
+                this.classList.toggle('active');
+            });
+        }
+
+        function updateDNAModel() {
+            scene.remove(dnaModel);
+            const dnaRenderer = new DNARenderer();
+            dnaModel = dnaRenderer.createDNA();
+            scene.add(dnaModel);
+        }
+
+        // Base info popup functions
+        function setupBaseInfoPopup() {
+            const popup = document.getElementById('base-info-popup');
+            const overlay = document.getElementById('popup-overlay');
+            const closeBtn = document.getElementById('close-popup');
+            
+            // Close popup when clicking close button or overlay
+            closeBtn.addEventListener('click', closePopup);
+            overlay.addEventListener('click', closePopup);
+            
+            // Add click event listener to canvas for base selection
+            renderer.domElement.addEventListener('click', onCanvasClick);
+            
+            // Close popup when pressing Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePopup();
+            });
+        }
+        
+        function onCanvasClick(event) {
+            // Calculate mouse position in normalized device coordinates
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Calculate objects intersecting the picking ray
+            const intersects = raycaster.intersectObjects(baseMeshes.map(item => item.mesh));
+            
+            if (intersects.length > 0) {
+                const clickedBase = baseMeshes.find(item => item.mesh === intersects[0].object);
+                if (clickedBase) {
+                    showBaseInfo(clickedBase.baseType);
+                }
+            }
+        }
+        
+        function showBaseInfo(baseType) {
+            const info = baseInfo[baseType];
+            if (!info) return;
+            
+            // Update popup content
+            document.getElementById('base-name').textContent = info.name;
+            document.getElementById('base-color-indicator').style.backgroundColor = info.color;
+            document.getElementById('base-type').textContent = info.type;
+            document.getElementById('base-formula').textContent = info.formula;
+            document.getElementById('base-pairs-with').textContent = info.pairsWith;
+            document.getElementById('base-bonds').textContent = info.bonds;
+            document.getElementById('base-description').textContent = info.description;
+            document.getElementById('base-structure-img').src = info.image;
+            document.getElementById('base-structure-img').alt = `${info.name} chemical structure`;
+            
+            // Show popup and overlay
+            document.getElementById('base-info-popup').style.display = 'block';
+            document.getElementById('popup-overlay').style.display = 'block';
+        }
+        
+        function closePopup() {
+            document.getElementById('base-info-popup').style.display = 'none';
+            document.getElementById('popup-overlay').style.display = 'none';
+        }
+
+        // Window resize handler
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Initialize everything
+        async function init() {
+            try {
+                initThreeJS();
+                setupToggles();
+                setupBaseInfoPopup();
+                await initMediaPipe();
+                
+                // Hide loading screen
+                document.getElementById('loading').style.display = 'none';
+                
+                // Start animation
+                animate();
+                
+                // Add window resize listener
+                window.addEventListener('resize', onWindowResize);
+                
+                console.log('DNA Explorer initialized successfully');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<div style="color: #ff0000;"><h2>Error Loading DNA Explorer</h2><p>' + error.message + '</p></div>';
+            }
+        }
+
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
