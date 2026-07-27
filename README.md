@@ -133,12 +133,10 @@ API keys are managed via environment variables and excluded from version control
 
 ---
 
-## 👨‍💻 Author
 
-**Vikas CR**  
-AI & Machine Learning Enthusiast  
-GitHub: https://github.com/vikas935
 
----
+
+
+
 
 ⭐ If you like this project, give it a star!
